@@ -1,0 +1,32 @@
+[
+  {
+    "id": "u2netp",
+    "kind": "subject_saliency",
+    "onnxPath": "models/u2netp.onnx",
+    "sha256": "PLACEHOLDER_FILL_WITH_SHA256_OF_WEIGHT_FILE",
+    "bytes": 0,
+    "inputSize": [320, 320],
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/xuebinqin/U-2-Net"
+  },
+  {
+    "id": "facedetlite",
+    "kind": "face_detection",
+    "onnxPath": "models/facedetlite.onnx",
+    "sha256": "PLACEHOLDER_FILL_WITH_SHA256_OF_WEIGHT_FILE",
+    "bytes": 0,
+    "inputSize": [640, 480],
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/PaddlePaddle/PaddleDetection"
+  },
+  {
+    "id": "ppocrv6tiny",
+    "kind": "text_detection",
+    "onnxPath": "models/ppocrv6tiny_det.onnx",
+    "sha256": "PLACEHOLDER_FILL_WITH_SHA256_OF_WEIGHT_FILE",
+    "bytes": 0,
+    "inputSize": [320, 320],
+    "license": "Apache-2.0",
+    "homepage": "https://github.com/PaddlePaddle/PaddleOCR"
+  }
+]

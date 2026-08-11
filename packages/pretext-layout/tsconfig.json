@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "../../node_modules/.tmp/pretext-layout.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

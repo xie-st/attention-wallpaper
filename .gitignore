@@ -1,0 +1,33 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.DS_Store
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/WixTools/
+src-tauri/.cargo/
+
+# Build artifacts
+*.log
+coverage/
+.cache/
+*.tsbuildinfo
+
+# Local data (never commit user content / secrets)
+*.sqlite
+*.sqlite-journal
+*.db
+.env
+.env.*
+!.env.example
+models/*.onnx
+models/*.ort
+generated/
