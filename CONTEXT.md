@@ -19,8 +19,16 @@ A normal Tauri window (with decorations) for importing/managing Source Articles,
 _Avoid_: Main window, settings window
 
 **Pet**:
-An AI character that walks around the Overlay Window's Canvas. Movement is stop-and-go: variable step size, side-to-side drift, with a net downward average rate. The pet's vertical position drives article text scroll (pet descends → text advances; double-click pet → pet walks backward → text rewinds). Movement is non-deterministic but bounded by an average rate.
+An AI character that walks around the Overlay Window's Canvas. Movement is stop-and-go: variable step size, side-to-side drift, with a net downward average rate. The pet's vertical position drives article text scroll (pet descends → text advances; double-click pet → pet walks backward → text rewinds). Movement is non-deterministic but bounded by an average rate. The pet is **scripted** (Perlin noise + state machine), not ML-driven — no inference, no ONNX.
 _Avoid_: Avatar, character, mascot
+
+**Spritesheet**:
+The pet's asset format — a Codex-compatible 8×9 standard atlas (`1536×1872`, 8 columns × 9 rows of `192×208` cells) plus a `pet.json` manifest. Adopted from the Codex pets ecosystem (OpenAI's `hatch-pet` skill, `openpets.sh`, `codex-pets.net`) so community pets drop in directly. The 8×11 v2 superset (with 16 gaze directions) is also supported.
+_Avoid_: Pet image, character art, sprite
+
+**Pet Behavior State**:
+One of 9 states mapped to the spritesheet rows, re-semanticized from Codex's "AI agent status" to this product's "reader walker" metaphor: `idle` (stationary), `drift-right` / `drift-left` (side-to-side during walks), `celebrate` (flourish on rewind-complete/article-switch), `hop` (rare idle hop), `end-of-article` (scroll reached the end), `pause` (stop-and-go pause), `walk-down` (core forward state — pet descends, Scroll Progress advances), `walk-up` (rewind state — pet ascends after double-click, Scroll Progress rewinds). Drives which spritesheet row the renderer plays.
+_Avoid_: Animation state, agent state
 
 **Scroll Progress**:
 The current vertical offset into the Source Article's pretext-laid-out text, synchronized with the pet's vertical position. Not time-driven (no 15-min cadence); advanced or rewound purely by pet movement.
