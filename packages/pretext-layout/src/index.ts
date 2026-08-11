@@ -5,6 +5,20 @@ import {
   type PreparedTextWithSegments
 } from "@chenglou/pretext";
 
+export {
+  pretextArticleLayout,
+  ARTICLE_FONT_FAMILY,
+  MIN_FONT_SIZE,
+  MAX_FONT_SIZE,
+  WHITESPACE_MIN,
+  WHITESPACE_MAX,
+  MAX_ITERATIONS,
+  type LaidOutArticle,
+  type LaidOutColumn,
+  type PretextArticleLayoutOptions,
+  type RectLike,
+} from "./article-layout";
+
 export interface FontSpec {
   family: string;
   size: number;
