@@ -252,7 +252,7 @@ Wire `pub mod inference;` in `lib.rs` (`:1-4`); add `OrtBridge` to managed state
 
 ## 4. Cross-cutting ambiguities (flag for `grill-with-docs` follow-up)
 
-1. **Light vs dark theme** — `styles.css` is dark (`#0e1116`); 清新简约 directive suggests light off-white (`#FAFBTC`). Not yet decided; needs user input.
+1. **Light vs dark theme** — `styles.css` is dark (`#0e1116`); 清新简约 directive confirms **light theme** (`#FAFBFC` bg, `#2E3440` text, one sage/sky accent). Full restyle required.
 2. **Sentence segmentation location** — ADR-0015 implies TS (articlesTab reader), but article-replace invalidation (ADR-0015) needs Rust to re-materialize spans. Shared segmentation rules must live somewhere; currently undefined.
 3. **Wallpaper text shadow** — ADR-0006 defers shadow/outline decision; `compositor.ts:121-123` currently always-on. Needs a follow-up sub-decision.
 4. **`RotationDto.next_at` / `pending_since`** — always `None`; should compute or be removed.

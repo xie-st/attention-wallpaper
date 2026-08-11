@@ -153,13 +153,14 @@ Two additional skill packs (installed earlier) bind to UI-bearing phases:
 
 ### Aesthetic directive — 清新简约
 
-The user's stated visual direction: **fresh/clean palette + minimal style**. Concrete interpretation the implementer must follow:
+The user's stated visual direction: **fresh/clean palette + minimal style, LIGHT theme**. Concrete interpretation the implementer must follow:
 
-- **Palette**: cool-leaning neutrals (off-white #FAFBFC backgrounds, soft slate text #2E3440, one accent — suggested a calm sage/celadon green #6B8F71 or muted sky #7AA6C2, used sparingly for primary actions only). No saturated primaries, no dark-mode-by-default.
-- **Layout**: generous whitespace; single-column flows; max 2 visual zones per screen; no cards-within-cards; no drop shadows except where a surface genuinely floats.
-- **Typography (UI chrome, distinct from Passage-on-wallpaper typography)**: a single sans-serif for all in-app chrome (Noto Sans SC), 14–16px body, restrained weights (400/500). The serif Noto Serif SC is reserved for Passage text *on the wallpaper only* — UI chrome stays sans for contrast.
-- **Iconography**: line icons only (stroke 1.5px), no filled icons. Consistent set (e.g. Lucide).
-- **Motion**: none beyond native OS transitions. No fade-ins, no springs.
+- **Theme**: light. Background `#FAFBFC`, elevated surfaces `#FFFFFF` or `#F1F4F7`, text `#2E3440` (soft slate), secondary text `#6B7280`, borders `#E5E9EF`. No dark-mode-by-default.
+- **Accent**: one calm color — suggested sage `#6B8F71` OR muted sky `#7AA6C2`. Used sparingly on primary action buttons + active-tab indicator only. No saturated primaries.
+- **Layout**: generous whitespace; single-column flows; max 2 visual zones per screen; no cards-within-cards; no drop shadows except where a surface genuinely floats (and even then, minimal).
+- **Typography (UI chrome)**: Noto Sans SC, 14–16px body, restrained weights (400/500). The serif Noto Serif SC is reserved for Passage text *on the wallpaper only*.
+- **Iconography**: line icons only (stroke 1.5px), no filled icons. Consistent set (lucide-react).
+- **Motion**: none beyond native OS transitions. No fade-ins, no springs, no button hover color transitions.
 
 This directive is referenced by every UI slice in Phase 7 and is non-negotiable for MVP.
 

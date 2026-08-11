@@ -38,4 +38,4 @@ pnpm tauri:build          # MSI + NSIS installer
 
 ## Aesthetic directive
 
-Fresh/clean palette + minimal style (see `docs/DEVELOPMENT_PLAN.md` → "Aesthetic directive — 清新简约"). Cool-leaning neutrals, one accent (sage/sky), sans-serif UI chrome (Noto Sans SC), serif reserved for Passage text on the wallpaper (Noto Serif SC). Line icons only, no drop shadows, no motion. Non-negotiable for MVP.
+Fresh/clean palette + minimal style (see `docs/DEVELOPMENT_PLAN.md` → "Aesthetic directive — 清新简约"). **Light theme**: off-white background (`#FAFBFC`), soft slate text (`#2E3440`), one accent (suggested calm sage `#6B8F71` or muted sky `#7AA6C2`, used sparingly for primary actions only). No saturated primaries, no dark-mode-by-default. Sans-serif UI chrome (Noto Sans SC) 14–16px body; serif reserved for Passage text on the wallpaper only (Noto Serif SC). Line icons only (stroke 1.5px, e.g. lucide), no drop shadows, no motion beyond native OS transitions. Non-negotiable for MVP.
