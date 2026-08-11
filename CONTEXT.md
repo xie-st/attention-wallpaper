@@ -43,7 +43,7 @@ A screen-space rectangle occupied by a desktop icon, detected via the Windows UI
 _Avoid_: Icon position, icon area
 
 **Text Region**:
-A rectangular region of the screen free of Icon Rects, computed by scanning vertically-empty column-groups and merging adjacent free columns, then padding around stray icons inside otherwise-empty regions. One Text Region may hold one or more **Display Columns**. When the desktop is icon-cluttered, Text Regions shrink and column count drops (possibly to 1); when empty, the whole screen is one Text Region.
+A rectangular region of the screen free of Icon Rects, computed by a two-pass algorithm: (1) topology pass — build an occupancy grid from desktop icon cells, group adjacent free/sparse columns into Candidate Regions, split regions at sparse-column clusters (so an icon at the 40/60 position of an empty area produces a 40/60 column split), pad around stray icons; (2) pretext pass — `@chenglou/pretext` lays out article text into the candidate regions, iterating font size + column proportions until whitespace ratio and contrast constraints are met. One Text Region may hold one or more **Display Columns**; column proportions follow icon-implied topology. When icons move, the entire pipeline re-runs (no special drag handler). See ADR-0022.
 _Avoid_: Text zone, text area, column area
 
 **Solid Background**:
