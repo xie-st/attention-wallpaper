@@ -495,12 +495,37 @@ where
             | (WS_EX_TOOLWINDOW as isize)
             | (WS_EX_NOACTIVATE as isize);
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex);
+        eprintln!("[overlay] applied WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE to hwnd={:#x}", hwnd as usize);
 
-        // Install subclass for WM_NCHITTEST. Subclass ID 0xAW01 is arbitrary but
-        // must be unique per-window; we only subclass one window.
+        // Install subclass for WM_NCHITTEST on the top-level window AND its
+        // child webview (Tauri 2's webview is a child HWND; WM_NCHITTEST on the
+        // top-level only fires for the non-client area, child area messages go
+        // to the child). Subclassing both is the safe option.
         let ok = SetWindowSubclass(hwnd, Some(overlay_subclass_proc), 0xA601, 0);
+        eprintln!("[overlay] SetWindowSubclass top-level hwnd={:#x} ok={}", hwnd as usize, ok);
         if ok == 0 {
-            return Err("SetWindowSubclass failed".to_string());
+            return Err("SetWindowSubclass (top-level) failed".to_string());
+        }
+        // Walk immediate children to find the webview (class Chrome_WidgetWin_0
+        // or similar). Subclass each child so hit-test works inside the webview area.
+        let mut child = windows_sys::Win32::UI::WindowsAndMessaging::GetWindow(
+            hwnd,
+            windows_sys::Win32::UI::WindowsAndMessaging::GW_CHILD,
+        );
+        while !child.is_null() {
+            let mut cls = [0u16; 64];
+            let n = GetClassNameW(child, cls.as_mut_ptr(), 64);
+            let name = if n > 0 {
+                String::from_utf16_lossy(&cls[..n as usize])
+            } else {
+                String::new()
+            };
+            let ok = SetWindowSubclass(child, Some(overlay_subclass_proc), 0xA602, 0);
+            eprintln!("[overlay] SetWindowSubclass child hwnd={:#x} class='{}' ok={}", child as usize, name, ok);
+            child = windows_sys::Win32::UI::WindowsAndMessaging::GetWindow(
+                child,
+                windows_sys::Win32::UI::WindowsAndMessaging::GW_HWNDNEXT,
+            );
         }
 
         // Install WinEventHook for foreground changes. WINEVENT_OUTOFCONTEXT
@@ -515,6 +540,7 @@ where
             0,
             WINEVENT_OUTOFCONTEXT,
         );
+        eprintln!("[overlay] SetWinEventHook ok={}", !hook.is_null());
         if hook.is_null() {
             return Err("SetWinEventHook failed".to_string());
         }
@@ -599,6 +625,12 @@ unsafe extern "system" fn overlay_subclass_proc(
             .lock()
             .map(|r| x >= r.left && x < r.right && y >= r.top && y < r.bottom)
             .unwrap_or(false);
+        if _id == 0xA602 {
+            // child-level: log occasionally. (Log only when in pet for noise control.)
+            if in_pet {
+                eprintln!("[overlay] WM_NCHITTEST child hwnd={:#x} at ({},{}) in_pet=true -> HTCLIENT", hwnd as usize, x, y);
+            }
+        }
         if in_pet {
             return HTCLIENT as LRESULT;
         }

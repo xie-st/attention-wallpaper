@@ -78,6 +78,7 @@ export function OverlayWindow() {
     lastAlphaByte: 0,
     // Timing:
     lastFrameTs: 0,
+    lastLogTs: 0,
     lastIconRectsFetch: 0,
     // Pet rect (screen coords) for WM_NCHITTEST publish:
     petRectScreen: { left: 0, top: 0, w: 0, h: 0 },
@@ -95,6 +96,7 @@ export function OverlayWindow() {
       unlistenVisibility = await listen<{ visible: boolean }>(
         "overlay://visibility",
         (e) => {
+          console.log("[overlay] visibility event:", e.payload.visible);
           stateRef.current.foregroundIsDesktop = e.payload.visible;
         },
       );
@@ -112,13 +114,14 @@ export function OverlayWindow() {
       const primary = monitors.find((m: MonitorInfo) => m.isPrimary) ?? monitors[0];
       const screenW = primary?.width ?? window.screen.width;
       const screenH = primary?.height ?? window.screen.height;
-
+      console.log("[overlay] init screensize:", screenW, screenH, "articles:", articles.length);
       const s = stateRef.current;
       s.articles = articles.length > 0 ? articles : [makePlaceholderArticle()];
       s.settings = settings;
       s.iconRects = iconResult.rects;
       s.textRegions = computeTextRegionsFor(screenW, screenH, iconResult.rects);
       s.articleLayout = layoutCurrentArticle(s);
+      console.log("[overlay] regions computed:", s.textRegions.length, "article layout cols:", s.articleLayout?.columns.length ?? 0);
 
       // Place pet at top-center of the work area.
       s.petX = screenW / 2 - PET_W / 2;
@@ -127,6 +130,7 @@ export function OverlayWindow() {
       // Apply Rust hooks (z-order styles + WinEventHook + WM_NCHITTEST subclass).
       try {
         await invoke("install_overlay_hooks");
+        console.log("[overlay] hooks installed");
       } catch (e) {
         console.error("[overlay] install_overlay_hooks failed:", e);
       }
@@ -153,6 +157,10 @@ export function OverlayWindow() {
     if (s.lastFrameTs === 0) s.lastFrameTs = ts;
     const dt = Math.min(64, ts - s.lastFrameTs); // clamp huge gaps (tab switch)
     s.lastFrameTs = ts;
+    if (ts - (s.lastLogTs ?? 0) > 1000) {
+      console.log("[overlay] frame alpha=", s.alpha.toFixed(3), "fgDesktop=", s.foregroundIsDesktop, "petState=", s.petState, "petY=", s.petY.toFixed(0));
+      s.lastLogTs = ts;
+    }
 
     // --- Visibility tween (ADR-0025).
     const vis = stepVisibility({
