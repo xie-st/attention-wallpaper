@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { bridge, IN_TAURI, type MonitorInfo, type Settings, type ModelStatus } from "./lib/tauri";
+import type { SourceArticle } from "@content-model";
 import { ContentSection } from "./sections/ContentSection";
 import { WallpaperSection } from "./sections/WallpaperSection";
 
@@ -13,7 +14,7 @@ const SECTIONS: { id: SectionId; label: string; icon: string }[] = [
 export function App() {
   const [section, setSection] = useState<SectionId>("content");
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
-  const [content, setContent] = useState<import("@content-model").ContentItem[]>([]);
+  const [articles, setArticles] = useState<SourceArticle[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [models, setModels] = useState<ModelStatus | null>(null);
   const [toast, setToast] = useState<{ msg: string; good: boolean } | null>(null);
@@ -24,14 +25,14 @@ export function App() {
   }, []);
 
   const refresh = useCallback(async () => {
-    const [mons, cont, sett, mds] = await Promise.all([
+    const [mons, arts, sett, mds] = await Promise.all([
       bridge.listMonitors(),
-      bridge.listContent(),
+      bridge.listSourceArticles(),
       bridge.getSettings(),
       bridge.getModelsStatus()
     ]);
     setMonitors(mons);
-    setContent(cont);
+    setArticles(arts);
     setSettings(sett);
     setModels(mds);
   }, []);
@@ -90,7 +91,7 @@ export function App() {
           <ContentSection settings={settings} onRefresh={refresh} onToast={showToast} />
         )}
         {section === "wallpaper" && (
-          <WallpaperSection monitors={monitors} content={content} settings={settings} onToast={showToast} onRefresh={refresh} />
+          <WallpaperSection monitors={monitors} content={articles} settings={settings} onToast={showToast} onRefresh={refresh} />
         )}
       </main>
 

@@ -7,7 +7,6 @@
     "types": ["vite/client", "node"],
     "baseUrl": ".",
     "paths": {
-      "@attention": ["packages/attention/src/index.ts"],
       "@pretext-layout": ["packages/pretext-layout/src/index.ts"],
       "@content-model": ["packages/content-model/src/index.ts"],
       "@layout-region": ["packages/layout-region/src/index.ts"]

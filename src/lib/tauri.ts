@@ -1,4 +1,4 @@
-import type { ContentItem } from "@content-model";
+import type { SourceArticle } from "@content-model";
 import { invoke as tauriInvoke, isTauri } from "@tauri-apps/api/core";
 
 export interface Rect { x: number; y: number; w: number; h: number; }
@@ -18,8 +18,10 @@ export interface IconRectsResult {
 }
 
 export interface Settings {
-  rotationIntervalMinutes: number;
-  modelManifestDir: string | null;
+  backgroundColor: string;
+  petPackageId: string | null;
+  petRate: number;
+  petPaused: boolean;
 }
 
 export interface RotationState {
@@ -50,6 +52,18 @@ export interface WallpaperProfile {
   savedAt: string;
 }
 
+export interface CreateArticleInput {
+  id: string;
+  title: string;
+  plainText: string;
+  paragraphs: string[];
+  importedAt: number;
+}
+
+export interface DeleteArticleResult {
+  removed: boolean;
+}
+
 export const IN_TAURI = isTauri();
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -59,7 +73,7 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 // ---------- Browser-dev fallback (exercises the same local packages) ----------
 
 const LS = {
-  content: "aw.content",
+  articles: "aw.articles",
   settings: "aw.settings",
   rotation: "aw.rotation",
   profiles: "aw.profiles"
@@ -78,8 +92,10 @@ function lsSet<T>(key: string, val: T): void {
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  rotationIntervalMinutes: 25,
-  modelManifestDir: null
+  backgroundColor: "#FAFBFC",
+  petPackageId: null,
+  petRate: 50,
+  petPaused: false,
 };
 
 const DEFAULT_ROTATION: RotationState = {
@@ -132,23 +148,23 @@ export const bridge = {
     return { ok: false, appliedPath: null, error: "browser-dev: restore requires the Windows host." };
   },
 
-  async listContent(): Promise<ContentItem[]> {
-    if (IN_TAURI) return invoke<ContentItem[]>("list_content");
-    return lsGet<ContentItem[]>(LS.content, []);
+  async listSourceArticles(): Promise<SourceArticle[]> {
+    if (IN_TAURI) return invoke<SourceArticle[]>("list_source_articles");
+    return lsGet<SourceArticle[]>(LS.articles, []);
   },
 
-  async saveContent(item: ContentItem): Promise<void> {
-    if (IN_TAURI) return invoke<void>("save_content", { item });
-    const items = lsGet<ContentItem[]>(LS.content, []);
-    const idx = items.findIndex((i) => i.id === item.id);
-    if (idx >= 0) items[idx] = item; else items.push(item);
-    lsSet(LS.content, items);
+  async createArticle(input: CreateArticleInput): Promise<void> {
+    if (IN_TAURI) return invoke<void>("create_source_article", { input });
+    const items = lsGet<SourceArticle[]>(LS.articles, []);
+    items.push(input);
+    lsSet(LS.articles, items);
   },
 
-  async deleteContent(id: string): Promise<void> {
-    if (IN_TAURI) return invoke<void>("delete_content", { id });
-    const items = lsGet<ContentItem[]>(LS.content, []).filter((i) => i.id !== id);
-    lsSet(LS.content, items);
+  async deleteArticle(id: string): Promise<DeleteArticleResult> {
+    if (IN_TAURI) return invoke<DeleteArticleResult>("delete_source_article", { id });
+    const items = lsGet<SourceArticle[]>(LS.articles, []).filter((i) => i.id !== id);
+    lsSet(LS.articles, items);
+    return { removed: true };
   },
 
   async getSettings(): Promise<Settings> {

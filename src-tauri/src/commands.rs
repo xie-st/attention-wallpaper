@@ -1,4 +1,4 @@
-use crate::db::{ContentRow, WallpaperProfileRow};
+use crate::db::{SettingsRow, SourceArticleRow, WallpaperProfileRow};
 use crate::platform;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
@@ -42,18 +42,33 @@ pub struct ApplyDto {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SettingsDto {
-    pub rotation_interval_minutes: i64,
-    pub model_manifest_dir: Option<String>,
+    pub background_color: String,
+    pub pet_package_id: Option<String>,
+    pub pet_rate: i64,
+    pub pet_paused: bool,
 }
 
 impl Default for SettingsDto {
     fn default() -> Self {
         Self {
-            rotation_interval_minutes: 25,
-            model_manifest_dir: None,
+            background_color: "#FAFBFC".into(),
+            pet_package_id: None,
+            pet_rate: 50,
+            pet_paused: false,
+        }
+    }
+}
+
+impl From<SettingsRow> for SettingsDto {
+    fn from(r: SettingsRow) -> Self {
+        Self {
+            background_color: r.background_color,
+            pet_package_id: r.pet_package_id,
+            pet_rate: r.pet_rate,
+            pet_paused: r.pet_paused,
         }
     }
 }
@@ -92,6 +107,34 @@ pub struct WallpaperProfileDto {
     pub original_position: Option<String>,
     pub last_composited_path: Option<String>,
     pub saved_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateArticleInput {
+    pub id: String,
+    pub title: String,
+    pub plain_text: String,
+    pub paragraphs: Vec<String>,
+    pub imported_at: i64,
+}
+
+impl From<CreateArticleInput> for SourceArticleRow {
+    fn from(i: CreateArticleInput) -> Self {
+        SourceArticleRow {
+            id: i.id,
+            title: i.title,
+            plain_text: i.plain_text,
+            paragraphs: i.paragraphs,
+            imported_at: i.imported_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteArticleResult {
+    pub removed: bool,
 }
 
 #[tauri::command]
@@ -189,39 +232,41 @@ pub fn restore_wallpaper(state: State<'_, AppState>, monitor_id: Option<String>)
 }
 
 #[tauri::command]
-pub fn list_content(state: State<'_, AppState>) -> Result<Vec<ContentRow>, String> {
+pub fn list_source_articles(state: State<'_, AppState>) -> Result<Vec<SourceArticleRow>, String> {
     let db = state.db.lock().unwrap();
-    db.list_content().map_err(|e| e.to_string())
+    db.list_source_articles().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn save_content(state: State<'_, AppState>, item: ContentRow) -> Result<(), String> {
+pub fn create_source_article(
+    state: State<'_, AppState>,
+    input: CreateArticleInput,
+) -> Result<(), String> {
+    if input.title.trim().is_empty() {
+        return Err("title must not be empty".into());
+    }
+    if input.plain_text.trim().is_empty() {
+        return Err("plainText must not be empty".into());
+    }
     let db = state.db.lock().unwrap();
-    db.save_content(&item).map_err(|e| e.to_string())
+    db.create_source_article(&input.into()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn delete_content(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub fn delete_source_article(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<DeleteArticleResult, String> {
     let db = state.db.lock().unwrap();
-    db.delete_content(&id).map_err(|e| e.to_string())
+    db.delete_source_article(&id)
+        .map(|removed| DeleteArticleResult { removed })
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<SettingsDto, String> {
     let db = state.db.lock().unwrap();
-    let json = db.get_settings_json().map_err(|e| e.to_string())?;
-    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap_or_default();
-    let mut dto = SettingsDto::default();
-    if let Some(v) = parsed
-        .get("rotationIntervalMinutes")
-        .and_then(|v| v.as_i64())
-    {
-        dto.rotation_interval_minutes = v;
-    }
-    if let Some(v) = parsed.get("modelManifestDir").and_then(|v| v.as_str()) {
-        dto.model_manifest_dir = Some(v.to_string());
-    }
-    Ok(dto)
+    db.get_settings().map(SettingsDto::from).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -229,20 +274,29 @@ pub fn set_settings(
     state: State<'_, AppState>,
     patch: serde_json::Value,
 ) -> Result<SettingsDto, String> {
-    let db = state.db.lock().unwrap();
-    let json = db.get_settings_json().map_err(|e| e.to_string())?;
-    let mut current: serde_json::Value = serde_json::from_str(&json).unwrap_or_default();
-    if let Some(obj) = current.as_object_mut() {
-        if let Some(patch_obj) = patch.as_object() {
-            for (k, v) in patch_obj {
-                obj.insert(k.clone(), v.clone());
-            }
-        }
+    let mut row = {
+        let db = state.db.lock().unwrap();
+        db.get_settings().map_err(|e| e.to_string())?
+    };
+    if let Some(v) = patch.get("backgroundColor").and_then(|v| v.as_str()) {
+        row.background_color = v.to_string();
     }
-    db.set_settings_json(&serde_json::to_string(&current).unwrap_or_default())
-        .map_err(|e| e.to_string())?;
-    drop(db);
-    get_settings(state)
+    if let Some(v) = patch.get("petPackageId").and_then(|v| v.as_str()) {
+        row.pet_package_id = Some(v.to_string());
+    } else if patch.get("petPackageId").is_some() && patch["petPackageId"].is_null() {
+        row.pet_package_id = None;
+    }
+    if let Some(v) = patch.get("petRate").and_then(|v| v.as_i64()) {
+        row.pet_rate = v;
+    }
+    if let Some(v) = patch.get("petPaused").and_then(|v| v.as_bool()) {
+        row.pet_paused = v;
+    }
+    {
+        let db = state.db.lock().unwrap();
+        db.set_settings(&row).map_err(|e| e.to_string())?;
+    }
+    Ok(SettingsDto::from(row))
 }
 
 #[tauri::command]
