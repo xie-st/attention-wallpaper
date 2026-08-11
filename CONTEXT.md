@@ -1,45 +1,52 @@
 # Attention Wallpaper
 
-A local-first Windows desktop app that projects user-curated text passages onto the desktop wallpaper, so personally meaningful ideas stay in view as low-distraction reminders.
+A local-first Windows desktop app that renders a user-imported article as multi-column text directly on the desktop, with an AI pet walking across the text layer driving scroll progress. Built with Tauri 2 + React + Rust. The "wallpaper" is a static solid color; all dynamic content (article text + pet animation) lives in a transparent always-on-top overlay window.
+
+> **Note**: This CONTEXT.md reflects the architectural pivot in ADR-0019. Earlier ADRs (0001–0018) defining the Passages-on-wallpaper model are superseded; this glossary describes the post-pivot product.
 
 ## Language
 
-**Passage**:
-A text unit the user has selected from a Source Article because they deeply agree with it and want it to repeatedly remind them. Consists of one or more adjacent sentences — the selection atom is a sentence, and the user may extend a highlight across adjacent sentences to capture a complete idea. Typically shorter than a full paragraph, never a whole article.
-_Avoid_: Quote, snippet, card, item
-
 **Source Article**:
-An article the user imports (from .docx/.txt/.md) whose contents they mine for Passages (e.g. Hamming's "You and Your Research" talk, notes from a teacher). The app preserves the Source Article as a browseable object so the user can read it in-app and select Passages by highlighting. Only paragraph-level structure is retained; inline styling (bold/italic/lists) is discarded — Passage layout on the wallpaper is plain-text anyway.
+An article the user imports (.docx/.txt/.md) that becomes the desktop's text layer. The whole article is the unit — no Passage extraction, no highlighting, no per-paragraph curation. Multiple articles may be stored; the user advances from one to the next.
 _Avoid_: Document, file, text
 
-**Wallpaper**:
-The desktop background image, imported by the user (PNG/JPG), onto which Passages are composited as plain text directly on the image — no card, no panel. The attention pipeline (saliency/edges/readability) exists precisely to make this plain-text overlay legible on arbitrary backgrounds. When contrast cannot reach WCAG ≥4.5:1, the layout degrades through the fallback ladder (reduce_count → reflow → translucent cards → safe rail) — translucent cards are a *degraded* mode, not the default. AI-generated wallpapers are out of scope for the MVP; the wallpaper is always a user-imported image.
-_Avoid_: Background, backdrop
+**Overlay Window**:
+A transparent, always-on-top, decoration-less Tauri window that covers the desktop and renders the article text columns + the pet via Canvas + requestAnimationFrame. Distinct from the Editor Window (the normal Tauri window for managing articles + settings). Wallpaper-engine-style: it does not paint a wallpaper PNG, it paints onto a transparent overlay.
+_Avoid_: Wallpaper layer, foreground window, canvas
 
-**Reminder** (vs. **Reading**):
-The core verb of the product. A Passage goes on the wallpaper to *remind*, not to be *read* end-to-end. This distinction shapes layout density, rotation cadence, and what counts as "done" — the goal is repeated exposure to a condensed idea, not comprehension of a full text.
-_Avoid_: Display, show
+**Editor Window**:
+A normal Tauri window (with decorations) for importing/managing Source Articles, choosing the solid background color, configuring the pet, and reading about/privacy. Opened on demand via tray; closed without quitting the app.
+_Avoid_: Main window, settings window
 
-**Passage Typography**:
-A single serif typeface (思源宋体 / Noto Serif SC) rendered as plain text on the wallpaper. Text color is auto-selected (pure white or pure black) by the readability pipeline to meet WCAG ≥4.5:1 against the local background. No user-facing font picker in the MVP.
-_Avoid_: Card text, label
+**Pet**:
+An AI character that walks around the Overlay Window's Canvas. Movement is stop-and-go: variable step size, side-to-side drift, with a net downward average rate. The pet's vertical position drives article text scroll (pet descends → text advances; double-click pet → pet walks backward → text rewinds). Movement is non-deterministic but bounded by an average rate.
+_Avoid_: Avatar, character, mascot
 
-**Priority** (of a Passage):
-A 3-level enum — 核心 (high, weight 3x) / 普通 (medium, weight 1x) / 偶尔 (low, weight 0.3x) — that biases selection toward higher-priority Passages during rotation. Combined with frequency (how long since last shown) and recency (when created) per the content-model.
-_Avoid_: Weight, score, importance
+**Scroll Progress**:
+The current vertical offset into the Source Article's pretext-laid-out text, synchronized with the pet's vertical position. Not time-driven (no 15-min cadence); advanced or rewound purely by pet movement.
+_Avoid_: Rotation, position, page
 
-**Attention Pipeline** (Heuristic vs ONNX):
-The local pipeline that finds low-distraction regions on a wallpaper for Passage placement. Two tiers exist, both **active in the MVP**: (1) **Heuristic** — FFT spectral residual + Sobel edge density + luminance/color variance + readability penalty, always works, no dependencies; (2) **ONNX-enhanced** — U2-NetP (subject saliency), FaceDetLite (face detection), PP-OCRv6-tiny (existing-text detection), runs fully locally via ONNX Runtime. When the user has installed models in `models/` with a valid `manifest.json`, the ONNX tier runs and its results feed `softCost` (replacing/augmenting the heuristic subject-saliency term); when models are absent, the pipeline transparently falls back to heuristic-only. Models are user-installed (never auto-downloaded) per the privacy guarantee.
-_Avoid_: Saliency, vision model, attention model
+**Display Column**:
+One of two pretext-laid-out text columns on the right half of the screen. Column count is fixed at 2; column width adapts to display dimensions and font size. The left half is reserved for desktop icons (by assumption). The final partial column, if it can't be filled, degrades to a single row per the user's layout rule (re-confirm in grilling).
+_Avoid_: Text pane, text region, slot
+
+**Solid Background**:
+The desktop wallpaper itself — a single solid color set once via `IDesktopWallpaper::SetWallpaper` (or kept as the user's existing wallpaper). The Overlay Window's transparency lets this color show through behind the text. No PNG/JPG import.
+_Avoid_: Wallpaper image, background image
 
 ## Relationships
 
-- A **Source Article** yields zero or more **Passages**
-- A **Passage** originates from exactly one **Source Article**
-- Exactly one **Passage** is composited onto a **Wallpaper** at a time (see ADR-0001)
-- A rotation set (one Passage per monitor across N monitors) is drawn entirely from a single Source Article — all monitors in the same set show Passages from the same article, reinforcing one theme's exposure (see ADR-0016)
-- When an article's Passage count is less than the monitor count, the surplus monitors keep their previous wallpaper state until the next rotation
+- A **Source Article** is imported via the **Editor Window** and stored locally.
+- The **Overlay Window** renders the current **Source Article** as **Display Columns** + the **Pet**.
+- The **Pet**'s vertical position determines **Scroll Progress** through the current **Source Article**.
+- When **Scroll Progress** reaches the end of a **Source Article**, the next stored article begins (ordering TBD).
+- The **Solid Background** is set once and does not change with scroll or article switching.
 
-## Flagged ambiguities
+## Flagged ambiguities (to resolve in follow-up grilling)
 
-- README's content-model describes atomic "goals/questions/sentences" (≤1 sentence each, max 3 per monitor). The user's actual content unit is a **Passage** (a paragraph or section, potentially multi-sentence). Resolved: the canonical unit is **Passage**; the README model is a stale artifact to be reconciled.
+- "剩下的部分就变成一行" — the exact layout rule for the final partial column is not yet precise.
+- Whether the pet AI is a scripted behavior (perlin noise + state machine) or an actual inference-driven agent (would re-open ADR-0008 ONNX question).
+- Article switching: when scroll reaches the end, what determines the next article? Priority/import-time/manual?
+- Multi-monitor: does the overlay span all monitors, or is it per-monitor with one pet?
+- Tray actions: "下一组" no longer makes sense under pet-driven scroll. Tray re-spec needed.
+- The "AI selects which段" mode the user mentioned as an alternative to sequential scroll — deferred to post-MVP, or still in scope?
