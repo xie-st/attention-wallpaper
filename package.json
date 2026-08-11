@@ -16,7 +16,8 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "mock:server": "node mock-server/server.js",
-    "tauri:test": "cargo test --manifest-path src-tauri/Cargo.toml"
+    "tauri:test": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "proto:text-region": "npx tsx prototype/text-region/index.ts"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
