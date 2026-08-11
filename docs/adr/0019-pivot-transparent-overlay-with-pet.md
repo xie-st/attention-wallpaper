@@ -53,7 +53,7 @@ The following ADRs are **superseded by this ADR-0019**. Their rationale no longe
 4. **`packages/content-model` rewritten** — only `SourceArticle` type remains; no `Passage`, no selection algorithm, no scheduling. Article ordering for "next article after this one is fully scrolled" is the only selection-like concern.
 5. **`src-tauri/src/inference/` not built** — ADR-0008 void. Rust ONNX bridge not needed.
 6. **`src-tauri/src/platform/`** — `apply_wallpaper` used once at setup to set a solid color; `list_monitors` still used to size the overlay window. `get_desktop_icon_rects` is now load-bearing per ADR-0021/0022.
-7. **Editor UI sections collapse further** — likely just 内容 (article list + reader) + 设置 (background color, pet config, 关于). To be re-grilled.
+7. **Editor UI sections collapse further** — exactly two sections: **内容** (article list + import + reader, no tabs — Passage库 tab is gone per superseded ADR-0011) and **设置** (solid background color picker, pet package selector + average rate slider + pause toggle, 关于/privacy footer). The two-section split reflects the input-mode (manage articles) vs configure-mode (tune parameters) mental divide.
 8. **MVP scope: single-monitor only**. The overlay window covers the primary monitor. Multi-monitor support (cross-monitor span, per-monitor overlay, or secondary-monitor solid-only) deferred to post-MVP. This is a scope bound, not an architectural decision — the algorithm in ADR-0022 is monitor-count-agnostic.
 
 ## Consequences
