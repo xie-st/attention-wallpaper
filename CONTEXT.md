@@ -35,8 +35,16 @@ The current vertical offset into the Source Article's pretext-laid-out text, syn
 _Avoid_: Rotation, position, page
 
 **Display Column**:
-One of two pretext-laid-out text columns on the right half of the screen. Column count is fixed at 2; column width adapts to display dimensions and font size. The left half is reserved for desktop icons (by assumption). The final partial column, if it can't be filled, degrades to a single row per the user's layout rule (re-confirm in grilling).
-_Avoid_: Text pane, text region, slot
+A text column laid out by pretext in a **Text Region** (see below). Column count is **not fixed** — it is computed at runtime from the geometry of **Text Regions** (which themselves depend on **Icon Rects**). Column width adapts to display dimensions and font size.
+_Avoid_: Text pane, text slot
+
+**Icon Rect**:
+A screen-space rectangle occupied by a desktop icon, detected via the Windows UI Automation API (see ADR-0021). The collection of Icon Rects on a given monitor is the input to Text Region computation.
+_Avoid_: Icon position, icon area
+
+**Text Region**:
+A rectangular region of the screen free of Icon Rects, computed by scanning vertically-empty column-groups and merging adjacent free columns, then padding around stray icons inside otherwise-empty regions. One Text Region may hold one or more **Display Columns**. When the desktop is icon-cluttered, Text Regions shrink and column count drops (possibly to 1); when empty, the whole screen is one Text Region.
+_Avoid_: Text zone, text area, column area
 
 **Solid Background**:
 The desktop wallpaper itself — a single solid color set once via `IDesktopWallpaper::SetWallpaper` (or kept as the user's existing wallpaper). The Overlay Window's transparency lets this color show through behind the text. No PNG/JPG import.
