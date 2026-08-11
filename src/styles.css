@@ -28,6 +28,22 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Overlay window — transparent topmost canvas (ADR-0025). Body/html/#root/canvas
+   must all be transparent so the desktop shows through. WebView2 needs every
+   ancestor transparent; the window itself is configured transparent in tauri.conf.json. */
+body.overlay-window,
+body.overlay-window html,
+body.overlay-window #root {
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+body.overlay-window canvas {
+  display: block;
+  background: transparent;
+}
+
 .app {
   display: grid;
   grid-template-columns: 220px 1fr;

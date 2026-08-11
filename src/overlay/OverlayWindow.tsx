@@ -47,6 +47,15 @@ export function OverlayWindow() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [ready, setReady] = useState(false);
 
+  // Mark body as overlay-window so the transparent CSS path kicks in.
+  // Critical on Windows + WebView2: body's default background is opaque (#0e1116
+  // from styles.css :root) and would render the overlay as a solid black/dark box
+  // even though tauri.conf.json has transparent: true. See ADR-0025.
+  useEffect(() => {
+    document.body.classList.add("overlay-window");
+    return () => document.body.classList.remove("overlay-window");
+  }, []);
+
   // ----- Refs hold the live render-loop state (refs so RAF closure stays stable).
   const stateRef = useRef({
     articles: [] as SourceArticle[],
@@ -237,13 +246,8 @@ export function OverlayWindow() {
     const H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
-    // Apply overlay alpha (fade tween).
+    // Apply overlay alpha (fade tween). globalAlpha multiplies every subsequent draw.
     ctx.globalAlpha = s.alpha;
-
-    // Debug: solid bg in settings.backgroundColor so devs can see the overlay bounds.
-    // Comment out if it interferes with transparency. Low-saturation, per AGENTS.md.
-    ctx.fillStyle = s.settings.backgroundColor + "20"; // 12% opacity
-    ctx.fillRect(0, 0, W, H);
 
     // Text columns.
     if (s.articleLayout && s.articleLayout.columns.length > 0) {
