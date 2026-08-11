@@ -91,13 +91,14 @@ pub fn get_desktop_icon_rects(_monitor_id: &str) -> IconRectsResult {
                 } else {
                     "uiautomation"
                 };
+                let count = rects.len();
                 IconRectsResult {
                     rects,
                     source: source.to_string(),
                     diagnostic: if source == "fallback" {
                         "Windows UI Automation returned no icon rectangles; using edge-safe conservative fallback.".to_string()
                     } else {
-                        format!("UI Automation: {} icon rectangles", source)
+                        format!("UI Automation: {} icon rectangles", count)
                     },
                 }
             }

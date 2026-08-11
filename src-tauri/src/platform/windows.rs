@@ -221,7 +221,132 @@ unsafe extern "system" fn enum_proc(
 }
 
 pub fn get_desktop_icon_rects() -> Result<Vec<Rect>, String> {
-    Err("desktop icon UI Automation adapter is not available in this build".to_string())
+    let raw = walk_uia_desktop_icons()?;
+    Ok(collect_icon_rects(&raw))
+}
+
+/// Pure conversion from raw `(x, y, w, h)` tuples to `Rect` records.
+/// Factored out so it can be unit-tested with a mock fixture without
+/// standing up a real UIA tree (per issue #6 acceptance criteria).
+pub fn collect_icon_rects(raw: &[(f64, f64, f64, f64)]) -> Vec<Rect> {
+    raw.iter()
+        .map(|&(x, y, w, h)| Rect { x, y, w, h })
+        .collect()
+}
+
+/// Walk the desktop's `SHELLDLL_DefView > SysListView32` UIA subtree and
+/// collect each icon's bounding rectangle as `(x, y, w, h)` in physical
+/// screen coordinates. Returns an empty vec if the tree cannot be found
+/// (empty desktop or shell not ready); errors only on UIA init failure.
+fn walk_uia_desktop_icons() -> Result<Vec<(f64, f64, f64, f64)>, String> {
+    use uiautomation::UIAutomation;
+    use uiautomation::types::TreeScope;
+
+    let uia = UIAutomation::new()
+        .map_err(|e| format!("UIA init: {e}"))?;
+    let root = uia
+        .get_root_element()
+        .map_err(|e| format!("UIA root: {e}"))?;
+
+    // The desktop icon host lives under either Progman or WorkerW (when an
+    // active wallpaper engine re-parents the icons). Find SHELLDLL_DefView
+    // anywhere under the root, then its SysListView32 child.
+    let condition = uia
+        .create_true_condition()
+        .map_err(|e| format!("UIA true condition: {e}"))?;
+    let candidates = root
+        .find_all(TreeScope::Descendants, &condition)
+        .map_err(|e| format!("UIA descendents: {e}"))?;
+
+    let mut def_view = None;
+    for el in &candidates {
+        if let Ok(name) = el.get_classname() {
+            if name == "SHELLDLL_DefView" {
+                def_view = Some(el.clone());
+                break;
+            }
+        }
+    }
+    let def_view = match def_view {
+        Some(v) => v,
+        None => return Ok(Vec::new()),
+    };
+
+    let mut list_view = None;
+    for el in def_view
+        .find_all(TreeScope::Children, &condition)
+        .map_err(|e| format!("UIA def_view children: {e}"))?
+        .iter()
+    {
+        if let Ok(name) = el.get_classname() {
+            if name == "SysListView32" {
+                list_view = Some(el.clone());
+                break;
+            }
+        }
+    }
+    let list_view = match list_view {
+        Some(v) => v,
+        None => return Ok(Vec::new()),
+    };
+
+    let items = list_view
+        .find_all(TreeScope::Children, &condition)
+        .map_err(|e| format!("UIA listview children: {e}"))?;
+    let mut rects = Vec::new();
+    for item in &items {
+        if let Ok(r) = item.get_bounding_rectangle() {
+            let (l, t, rr, b) = (
+                r.get_left() as f64,
+                r.get_top() as f64,
+                r.get_right() as f64,
+                r.get_bottom() as f64,
+            );
+            rects.push((l, t, rr - l, b - t));
+        }
+    }
+    Ok(rects)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn collect_icon_rects_returns_input_unmodified() {
+        let fixture: Vec<(f64, f64, f64, f64)> = vec![
+            (0.0, 0.0, 48.0, 48.0),
+            (100.0, 200.0, 32.0, 32.0),
+            (1920.0, 0.0, 48.0, 48.0),
+        ];
+        let out = collect_icon_rects(&fixture);
+        assert_eq!(out.len(), 3);
+        assert_eq!(out[0].x, 0.0);
+        assert_eq!(out[0].y, 0.0);
+        assert_eq!(out[0].w, 48.0);
+        assert_eq!(out[0].h, 48.0);
+        assert_eq!(out[1].x, 100.0);
+        assert_eq!(out[1].y, 200.0);
+        assert_eq!(out[2].x, 1920.0);
+    }
+
+    #[test]
+    fn collect_icon_rects_empty_input_returns_empty() {
+        let out = collect_icon_rects(&[]);
+        assert!(out.is_empty());
+    }
+
+    #[test]
+    fn collect_icon_rects_preserves_plausible_screen_coords() {
+        let fixture = vec![(12.0, 24.0, 48.0, 48.0)];
+        let out = collect_icon_rects(&fixture);
+        assert_eq!(out.len(), 1);
+        let r = &out[0];
+        assert!(r.x >= 0.0 && r.x <= 4000.0);
+        assert!(r.y >= 0.0 && r.y <= 4000.0);
+        assert!(r.w > 0.0 && r.w <= 200.0);
+        assert!(r.h > 0.0 && r.h <= 200.0);
+    }
 }
 
 pub fn current_wallpaper_path(monitor_id: &str) -> Result<String, String> {
