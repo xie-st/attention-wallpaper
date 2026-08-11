@@ -78,7 +78,7 @@ export function ContentSection({ settings, onRefresh, onToast }: Props) {
     <div>
       <div className="section-head">
         <h1>内容</h1>
-        <p>管理目标、问题和句子。每台显示器最多显示 {settings.perMonitorMax} 条，每 {settings.rotationIntervalMinutes} 分钟轮换一次。</p>
+        <p>管理目标、问题和句子。每台显示器最多显示 1 条，每 {settings.rotationIntervalMinutes} 分钟轮换一次。</p>
       </div>
 
       {content.length === 0 && !editing && (

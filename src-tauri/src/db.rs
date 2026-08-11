@@ -31,10 +31,6 @@ pub struct ContentRow {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SettingsRow {
     pub rotation_interval_minutes: i64,
-    pub per_monitor_max: i64,
-    pub font_body: String,
-    pub font_display: String,
-    pub ai_base_url: String,
     pub model_manifest_dir: Option<String>,
 }
 
@@ -228,10 +224,6 @@ impl Default for SettingsRow {
     fn default() -> Self {
         Self {
             rotation_interval_minutes: 25,
-            per_monitor_max: 3,
-            font_body: "Microsoft YaHei UI".to_string(),
-            font_display: "Microsoft YaHei UI".to_string(),
-            ai_base_url: "http://127.0.0.1:4319".to_string(),
             model_manifest_dir: None,
         }
     }
@@ -292,11 +284,11 @@ mod tests {
     #[test]
     fn settings_roundtrip() {
         let db = tmp_db();
-        db.set_settings_json(r#"{"fontBody":"Test","max":5}"#)
+        db.set_settings_json(r#"{"rotationIntervalMinutes":15,"modelManifestDir":null}"#)
             .unwrap();
         let json = db.get_settings_json().unwrap();
-        assert!(json.contains("Test"));
-        assert!(json.contains("max"));
+        assert!(json.contains("rotationIntervalMinutes"));
+        assert!(json.contains("15"));
     }
 
     #[test]

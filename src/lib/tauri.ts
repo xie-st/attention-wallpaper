@@ -19,13 +19,7 @@ export interface IconRectsResult {
 
 export interface Settings {
   rotationIntervalMinutes: number;
-  perMonitorMax: number;
-  fontBody: string;
-  fontDisplay: string;
-  aiBaseUrl: string;
-  deviceTokenFromKeychain: boolean;
   modelManifestDir: string | null;
-  telemetry: boolean;
 }
 
 export interface RotationState {
@@ -85,13 +79,7 @@ function lsSet<T>(key: string, val: T): void {
 
 const DEFAULT_SETTINGS: Settings = {
   rotationIntervalMinutes: 25,
-  perMonitorMax: 3,
-  fontBody: "Microsoft YaHei UI",
-  fontDisplay: "Microsoft YaHei UI",
-  aiBaseUrl: "http://127.0.0.1:4319",
-  deviceTokenFromKeychain: false,
-  modelManifestDir: null,
-  telemetry: false
+  modelManifestDir: null
 };
 
 const DEFAULT_ROTATION: RotationState = {
@@ -197,10 +185,6 @@ export const bridge = {
     if (IN_TAURI) return invoke<RotationState>("pause_one_hour");
     const pausedUntil = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     return this.setRotationState({ pausedUntil });
-  },
-
-  async relayout(): Promise<void> {
-    if (IN_TAURI) await invoke<void>("relayout");
   },
 
   async getModelsStatus(): Promise<ModelStatus> {

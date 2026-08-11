@@ -78,8 +78,10 @@ export interface CompositeOutput {
   diagnostics: { level: "ok" | "warn" | "error"; code: string; message: string }[];
 }
 
-function pickFont(settings: Settings, sizePx: number): FontSpec {
-  return { family: settings.fontBody || "Microsoft YaHei UI", size: sizePx, weight: 500 };
+function pickFont(_settings: Settings, sizePx: number): FontSpec {
+  // Font family is no longer settings-driven post-pivot (ADR-0006 + ADR-0019).
+  // Hardcoded until slice #8 (pretextArticleLayout) reintroduces Noto Serif SC pinning.
+  return { family: "Microsoft YaHei UI", size: sizePx, weight: 500 };
 }
 
 function drawPlacement(
@@ -178,13 +180,13 @@ export async function composite(input: CompositeInput): Promise<CompositeOutput>
   // content-model selection with last-shown = lastRotatedAt per item.
   const now = new Date().toISOString();
   const items = input.content.filter((i) => i.enabled);
-  const rotation = selectForRotation(items, now, 1, input.settings.perMonitorMax, {});
+  const rotation = selectForRotation(items, now, 1, 1, {});
   const chosen = rotation[0] ?? [];
 
   const layout = proposeLayout(
     map,
     chosen.map((c) => ({ body: c.body, priority: priorityNum(c.priority) })),
-    { maxItems: input.settings.perMonitorMax, onnxActive: map.onnxActive }
+    { maxItems: 1, onnxActive: map.onnxActive }
   );
 
   // Draw wallpaper to a full-res canvas matching the monitor.

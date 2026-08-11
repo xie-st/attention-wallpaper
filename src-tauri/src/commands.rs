@@ -46,26 +46,14 @@ pub struct ApplyDto {
 #[serde(rename_all = "camelCase")]
 pub struct SettingsDto {
     pub rotation_interval_minutes: i64,
-    pub per_monitor_max: i64,
-    pub font_body: String,
-    pub font_display: String,
-    pub ai_base_url: String,
     pub model_manifest_dir: Option<String>,
-    pub device_token_from_keychain: bool,
-    pub telemetry: bool,
 }
 
 impl Default for SettingsDto {
     fn default() -> Self {
         Self {
             rotation_interval_minutes: 25,
-            per_monitor_max: 3,
-            font_body: "Microsoft YaHei UI".to_string(),
-            font_display: "Microsoft YaHei UI".to_string(),
-            ai_base_url: "http://127.0.0.1:4319".to_string(),
             model_manifest_dir: None,
-            device_token_from_keychain: false,
-            telemetry: false,
         }
     }
 }
@@ -230,18 +218,6 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<SettingsDto, String> {
     {
         dto.rotation_interval_minutes = v;
     }
-    if let Some(v) = parsed.get("perMonitorMax").and_then(|v| v.as_i64()) {
-        dto.per_monitor_max = v;
-    }
-    if let Some(v) = parsed.get("fontBody").and_then(|v| v.as_str()) {
-        dto.font_body = v.to_string();
-    }
-    if let Some(v) = parsed.get("fontDisplay").and_then(|v| v.as_str()) {
-        dto.font_display = v.to_string();
-    }
-    if let Some(v) = parsed.get("aiBaseUrl").and_then(|v| v.as_str()) {
-        dto.ai_base_url = v.to_string();
-    }
     if let Some(v) = parsed.get("modelManifestDir").and_then(|v| v.as_str()) {
         dto.model_manifest_dir = Some(v.to_string());
     }
@@ -399,10 +375,6 @@ pub fn pause_one_hour(state: State<'_, AppState>) -> Result<RotationDto, String>
     })
 }
 
-#[tauri::command]
-pub fn relayout() -> Result<(), String> {
-    // Relayout is handled by the frontend (which re-runs the composite pipeline
-    // and calls apply_wallpaper). This command is a signal for any backend-side
-    // bookkeeping; currently a no-op.
-    Ok(())
-}
+// relayout command removed per ADR-0023; re-layout action will be a UI button
+// in the 壁纸 section (slice #10). The frontend re-runs the composite pipeline
+// directly without a backend call.
