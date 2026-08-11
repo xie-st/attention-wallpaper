@@ -8,7 +8,7 @@ export default defineConfig({
       "@attention": fileURLToPath(new URL("./packages/attention/src/index.ts", import.meta.url)),
       "@pretext-layout": fileURLToPath(new URL("./packages/pretext-layout/src/index.ts", import.meta.url)),
       "@content-model": fileURLToPath(new URL("./packages/content-model/src/index.ts", import.meta.url)),
-      "@ai-client": fileURLToPath(new URL("./packages/ai-client/src/index.ts", import.meta.url)),
+      "@layout-region": fileURLToPath(new URL("./packages/layout-region/src/index.ts", import.meta.url)),
       "@": fileURLToPath(new URL("./src", import.meta.url))
     }
   },

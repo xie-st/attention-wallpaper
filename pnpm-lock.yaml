@@ -56,6 +56,8 @@ importers:
 
   packages/content-model: {}
 
+  packages/layout-region: {}
+
   packages/pretext-layout:
     dependencies:
       '@chenglou/pretext':
