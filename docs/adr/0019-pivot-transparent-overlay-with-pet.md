@@ -49,11 +49,12 @@ The following ADRs are **superseded by this ADR-0019**. Their rationale no longe
    - **Editor window** (normal Tauri window, decorations on, user-facing): import Source Article, choose solid background color, configure pet, read about/privacy. Only opened on demand.
    - **Overlay window** (transparent, always-on-top, decorations off, covers the desktop): renders the scrolling two-column article text + the walking pet via Canvas + requestAnimationFrame. Persists across workspace switches; sits below taskbar or sits above (TBD).
 2. **`packages/attention` deleted entirely** — no saliency/edge/readability pipeline. Solid color needs no analysis.
-3. **`packages/pretext-layout` retained and elevated** — it now lays out the *entire article* into two columns, not a single Passage. Its `maxLines` truncation concept is replaced by "total scroll length" (text overflows off-screen and is revealed by pet-driven scroll).
+3. **`packages/pretext-layout` retained and elevated** — it now lays out the *entire article* into Text Regions (per ADR-0022), not a single Passage. Its `maxLines` truncation concept is replaced by "total scroll length" (text overflows off-screen and is revealed by pet-driven scroll).
 4. **`packages/content-model` rewritten** — only `SourceArticle` type remains; no `Passage`, no selection algorithm, no scheduling. Article ordering for "next article after this one is fully scrolled" is the only selection-like concern.
 5. **`src-tauri/src/inference/` not built** — ADR-0008 void. Rust ONNX bridge not needed.
-6. **`src-tauri/src/platform/`** — `apply_wallpaper` used once at setup to set a solid color; `list_monitors` still used to size the overlay window. `get_desktop_icon_rects` may remain to detect "icons really are on the left" but is optional.
+6. **`src-tauri/src/platform/`** — `apply_wallpaper` used once at setup to set a solid color; `list_monitors` still used to size the overlay window. `get_desktop_icon_rects` is now load-bearing per ADR-0021/0022.
 7. **Editor UI sections collapse further** — likely just 内容 (article list + reader) + 设置 (background color, pet config, 关于). To be re-grilled.
+8. **MVP scope: single-monitor only**. The overlay window covers the primary monitor. Multi-monitor support (cross-monitor span, per-monitor overlay, or secondary-monitor solid-only) deferred to post-MVP. This is a scope bound, not an architectural decision — the algorithm in ADR-0022 is monitor-count-agnostic.
 
 ## Consequences
 
