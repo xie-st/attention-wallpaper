@@ -1,0 +1,19 @@
+[package]
+name = "aw-overlay-zorder-proto"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "overlay-zorder-proto"
+path = "src/main.rs"
+
+[dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Gdi",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.dev]
+panic = "unwind"

@@ -8,7 +8,7 @@ use std::os::windows::ffi::OsStrExt;
 use std::ptr;
 
 use windows_sys::core::GUID;
-use windows_sys::Win32::Foundation::{BOOL, LPARAM, RECT};
+use windows_sys::Win32::Foundation::{BOOL, LPARAM, LRESULT, RECT, WPARAM};
 use windows_sys::Win32::Graphics::Gdi::{
     EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO, MONITORINFOEXW,
 };
@@ -415,4 +415,194 @@ pub fn restore_wallpaper(
         .ok_or_else(|| "no original wallpaper path saved".to_string())?;
     set_wallpaper_path(monitor_id.unwrap_or_default(), path)?;
     Ok(path.to_string())
+}
+
+// ===========================================================================
+// Overlay window z-order + visibility hooks (ADR-0025).
+//
+// Strategy: the overlay is a topmost top-level window (Tauri config sets
+// `alwaysOnTop: true` + `transparent: true` + `decorations: false`). This
+// module applies `WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`, installs a
+// `WinEventHook(EVENT_SYSTEM_FOREGROUND)` that emits a Tauri event when the
+// foreground becomes / stops being the desktop (Progman/WorkerW), and
+// subclasses the overlay HWND so `WM_NCHITTEST` returns `HTCLIENT` inside the
+// current pet rect and `HTTRANSPARENT` elsewhere (full `HTTRANSPARENT` when
+// the overlay alpha is 0).
+// ===========================================================================
+
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::OnceLock;
+
+use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
+use windows_sys::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    GetClassNameW, GetForegroundWindow, GetWindowLongPtrW, SetWindowLongPtrW, EVENT_SYSTEM_FOREGROUND,
+    GWL_EXSTYLE, HTCLIENT, HTTRANSPARENT, WINEVENT_OUTOFCONTEXT, WM_NCHITTEST, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW,
+};
+
+/// Holds the Tauri AppHandle (set once at install time) so the WinEventHook
+/// callback — which is a raw function pointer — can reach back into Tauri to
+/// emit events. Tauri's AppHandle is Send+Sync + Clone.
+pub static OVERLAY_APP_HANDLE: OnceLock<()> = OnceLock::new();
+
+/// Static slot for a visibility-changed callback. Set by `install_overlay_hooks`.
+/// The callback is invoked from the WinEventHook thread.
+type VisibilityCb = Box<dyn Fn(bool) + Send + Sync + 'static>;
+static VISIBILITY_CALLBACK: OnceLock<VisibilityCb> = OnceLock::new();
+
+/// Tracks the last reported foreground-is-desktop state so the hook only fires
+/// the callback on actual transitions (not on every foreground change).
+static LAST_FOREGROUND_IS_DESKTOP: AtomicBool = AtomicBool::new(true);
+
+/// Current overlay alpha in [0, 255]. When 0, WM_NCHITTEST returns
+/// HTTRANSPARENT everywhere (including the pet rect) — no pet double-click on
+/// an invisible pet, per ADR-0025.
+static OVERLAY_ALPHA: AtomicU8 = AtomicU8::new(0);
+
+/// Current pet rect in screen coordinates (left, top, right, bottom). Updated
+/// by the overlay frontend every frame via `update_pet_rect`.
+struct PetRectState {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+}
+static PET_RECT: std::sync::Mutex<PetRectState> = std::sync::Mutex::new(PetRectState {
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+});
+
+/// Install the overlay z-order hooks: extended styles + WinEventHook + WndProc
+/// subclass for selective WM_NCHITTEST. `on_visibility` is fired on
+/// foreground-is-desktop transitions (true when the user returns to desktop,
+/// false when any non-desktop window comes to the foreground). Idempotent —
+/// safe to call multiple times; the subclass install is a no-op after the first.
+pub fn install_overlay_hooks<F>(hwnd: HWND, on_visibility: F) -> Result<(), String>
+where
+    F: Fn(bool) + Send + Sync + 'static,
+{
+    let _ = VISIBILITY_CALLBACK.set(Box::new(on_visibility));
+
+    unsafe {
+        // Apply WS_EX_TOOLWINDOW (hide from taskbar/Alt+Tab) + WS_EX_NOACTIVATE
+        // (don't steal focus when the user clicks on/near the overlay).
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let new_ex = ex
+            | (WS_EX_TOOLWINDOW as isize)
+            | (WS_EX_NOACTIVATE as isize);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex);
+
+        // Install subclass for WM_NCHITTEST. Subclass ID 0xAW01 is arbitrary but
+        // must be unique per-window; we only subclass one window.
+        let ok = SetWindowSubclass(hwnd, Some(overlay_subclass_proc), 0xA601, 0);
+        if ok == 0 {
+            return Err("SetWindowSubclass failed".to_string());
+        }
+
+        // Install WinEventHook for foreground changes. WINEVENT_OUTOFCONTEXT
+        // means the callback is delivered via the message loop on the calling
+        // thread (Tauri's main thread), not synchronously inside the hook.
+        let hook = SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            std::ptr::null_mut(),
+            Some(foreground_event_callback),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT,
+        );
+        if hook.is_null() {
+            return Err("SetWinEventHook failed".to_string());
+        }
+    }
+    Ok(())
+}
+
+/// Update the shared pet rect (screen coords). Called by the frontend every
+/// frame, via the `update_pet_rect` Tauri command. Cheap (single Mutex lock).
+pub fn update_pet_rect(left: f64, top: f64, w: f64, h: f64) {
+    if let Ok(mut r) = PET_RECT.lock() {
+        r.left = left as i32;
+        r.top = top as i32;
+        r.right = (left + w) as i32;
+        r.bottom = (top + h) as i32;
+    }
+}
+
+/// Update the shared overlay alpha (0..=255). Drives the WM_NCHITTEST gating:
+/// alpha==0 → full HTTRANSPARENT; alpha>0 → selective (pet rect HTCLIENT).
+pub fn update_overlay_alpha(alpha_0_255: u8) {
+    OVERLAY_ALPHA.store(alpha_0_255, Ordering::Relaxed);
+}
+
+unsafe extern "system" fn foreground_event_callback(
+    _h: HWINEVENTHOOK,
+    _event: u32,
+    _hwnd: HWND,
+    _id_object: i32,
+    _id_child: i32,
+    _thread: u32,
+    _time: u32,
+) {
+    // (signature matches WINEVENTPROC; body below)
+    let is_desktop = foreground_is_desktop();
+    let prev = LAST_FOREGROUND_IS_DESKTOP.swap(is_desktop, Ordering::SeqCst);
+    if prev != is_desktop {
+        if let Some(cb) = VISIBILITY_CALLBACK.get() {
+            cb(is_desktop);
+        }
+    }
+}
+
+/// Return true iff the current foreground window's class is `Progman` or
+/// `WorkerW` (the desktop windows).
+unsafe fn foreground_is_desktop() -> bool {
+    let fg = GetForegroundWindow();
+    if fg.is_null() {
+        return false;
+    }
+    let mut cls = [0u16; 64];
+    let n = GetClassNameW(fg, cls.as_mut_ptr(), 64);
+    if n <= 0 {
+        return false;
+    }
+    let name = String::from_utf16_lossy(&cls[..n as usize]);
+    name == "Progman" || name == "WorkerW"
+}
+
+/// Subclass procedure for the overlay HWND. Handles WM_NCHITTEST selectively:
+/// pet rect → HTCLIENT (pet double-click reaches the overlay), elsewhere →
+/// HTTRANSPARENT (clicks pass through to whatever is below). When overlay
+/// alpha is 0, returns HTTRANSPARENT everywhere (invisible pets cannot be
+/// double-clicked, per ADR-0025).
+unsafe extern "system" fn overlay_subclass_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    _data: usize,
+) -> LRESULT {
+    if msg == WM_NCHITTEST as u32 {
+        let alpha = OVERLAY_ALPHA.load(Ordering::Relaxed);
+        if alpha == 0 {
+            return HTTRANSPARENT as LRESULT;
+        }
+        // lparam packs screen coords as LOWORD(x), HIWORD(y).
+        let x = (lparam as u32 & 0xFFFF) as i16 as i32;
+        let y = ((lparam as u32 >> 16) & 0xFFFF) as i16 as i32;
+        let in_pet = PET_RECT
+            .lock()
+            .map(|r| x >= r.left && x < r.right && y >= r.top && y < r.bottom)
+            .unwrap_or(false);
+        if in_pet {
+            return HTCLIENT as LRESULT;
+        }
+        return HTTRANSPARENT as LRESULT;
+    }
+    DefSubclassProc(hwnd, msg, wparam, lparam)
 }

@@ -50,6 +50,9 @@ pub fn run() {
             commands::set_wallpaper_profile,
             commands::next_set,
             commands::pause_one_hour,
+            commands::install_overlay_hooks,
+            commands::update_pet_rect,
+            commands::set_overlay_alpha,
             // relayout removed per ADR-0023 (frontend-only operation now)
         ])
         .run(tauri::generate_context!())

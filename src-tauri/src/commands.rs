@@ -2,7 +2,7 @@ use crate::db::{SettingsRow, SourceArticleRow, WallpaperProfileRow};
 use crate::platform;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{Emitter, Manager, State};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -432,3 +432,46 @@ pub fn pause_one_hour(state: State<'_, AppState>) -> Result<RotationDto, String>
 // relayout command removed per ADR-0023; re-layout action will be a UI button
 // in the 壁纸 section (slice #10). The frontend re-runs the composite pipeline
 // directly without a backend call.
+
+// ===========================================================================
+// Overlay z-order + visibility hooks (ADR-0025). The overlay window is created
+// by `tauri.conf.json` (label="overlay") and these commands are invoked from
+// the overlay frontend after it mounts.
+// ===========================================================================
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VisibilityEvent {
+    pub visible: bool,
+}
+
+/// Install the overlay z-order hooks (extended styles + WinEventHook +
+/// WndProc subclass for selective WM_NCHITTEST). Idempotent. The `on_visibility`
+/// closure emits a Tauri event the frontend listens to for fade-in/out.
+#[tauri::command]
+pub fn install_overlay_hooks(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| "overlay window not found".to_string())?;
+    let hwnd = window.hwnd().map_err(|e| format!("hwnd: {e}"))?;
+    let app_for_cb = app.clone();
+    platform::install_overlay_hooks(hwnd.0 as _, move |visible| {
+        let _ = app_for_cb.emit("overlay://visibility", VisibilityEvent { visible });
+    })
+}
+
+/// Update the pet hit-test rect (screen coordinates). Called every frame by
+/// the overlay frontend so WM_NCHITTEST can decide whether the cursor is over
+/// the pet.
+#[tauri::command]
+pub fn update_pet_rect(left: f64, top: f64, w: f64, h: f64) {
+    platform::update_pet_rect(left, top, w, h);
+}
+
+/// Update the overlay alpha (0..=255). Drives WM_NCHITTEST gating: alpha=0 →
+/// full HTTRANSPARENT (invisible pets can't be clicked); alpha>0 → selective
+/// hit-test. Called every frame during the fade-in/out tween (~200ms).
+#[tauri::command]
+pub fn set_overlay_alpha(alpha: u8) {
+    platform::update_overlay_alpha(alpha);
+}

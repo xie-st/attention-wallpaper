@@ -226,3 +226,33 @@ pub fn get_models_status() -> ModelStatus {
         onnx_active: false,
     }
 }
+
+// ===========================================================================
+// Overlay window hooks (ADR-0025). Cross-platform facade; Windows has a real
+// implementation in `windows.rs`, other platforms are no-ops so the crate
+// still typechecks/tests in CI.
+// ===========================================================================
+
+#[cfg(windows)]
+pub use windows::{install_overlay_hooks, update_overlay_alpha, update_pet_rect};
+
+/// Cross-platform HWND-ish handle. On Windows this is a real HWND (pointer);
+/// on non-Windows it's a meaningless placeholder so the API keeps its shape.
+#[cfg(windows)]
+pub type OverlayHwnd = windows_sys::Win32::Foundation::HWND;
+#[cfg(not(windows))]
+pub type OverlayHwnd = *mut std::ffi::c_void;
+
+#[cfg(not(windows))]
+pub fn install_overlay_hooks<F>(_hwnd: OverlayHwnd, _on_visibility: F) -> Result<(), String>
+where
+    F: Fn(bool) + Send + Sync + 'static,
+{
+    Ok(())
+}
+
+#[cfg(not(windows))]
+pub fn update_pet_rect(_left: f64, _top: f64, _w: f64, _h: f64) {}
+
+#[cfg(not(windows))]
+pub fn update_overlay_alpha(_alpha_0_255: u8) {}

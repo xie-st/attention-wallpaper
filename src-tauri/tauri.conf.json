@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "editor",
         "title": "注意力壁纸",
         "width": 1080,
         "height": 740,
@@ -21,6 +22,23 @@
         "center": true,
         "fullscreen": false,
         "decorations": true
+      },
+      {
+        "label": "overlay",
+        "url": "index.html?window=overlay",
+        "title": "Overlay",
+        "width": 1260,
+        "height": 792,
+        "resizable": false,
+        "center": false,
+        "x": 0,
+        "y": 0,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": true
       }
     ],
     "security": {

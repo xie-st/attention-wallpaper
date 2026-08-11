@@ -1,5 +1,7 @@
 # Overlay window at desktop layer (below normal windows, above wallpaper)
 
+**Status: superseded by [ADR-0025](0025-overlay-topmost-foreground-autohide.md)** — the desktop-layer z-order mechanism (`SetParent(WorkerW/Progman)`) was empirically disproven by the `prototype/overlay-zorder/` prototype: WorkerW-parent hides the overlay behind SHELLDLL_DefView (full-screen opaque icon ListView), and Progman does not paint child windows. ADR-0025 achieves the same user intent (ritual exposure, covered while working, survives Win+D) via a topmost window + foreground-window auto-hide. The "Why" section below still holds; the "How" section is voided.
+
 The Overlay Window sits at the **desktop layer**: above the wallpaper and desktop icons, but **below normal application windows**. When the user has any ordinary window open (browser, editor, etc.), the overlay is covered and invisible. When the user returns to the desktop (minimizes all windows or Win+D), the article text + pet reappear.
 
 ## Why
